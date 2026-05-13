@@ -11,10 +11,20 @@ internal static class HurtColliderPatch
     [HarmonyPatch(typeof(PhysGrabObjectImpactDetector), "Start")]
     private static void ImpactDetectorStartPostfix(PhysGrabObjectImpactDetector __instance)
     {
-        if (__instance.GetComponent<ItemEquippable>() != null)
+        if (__instance.GetComponent<ItemEquippable>() == null)
         {
-            __instance.destroyDisable = true;
+            return;
         }
+
+        if (__instance.GetComponent<ItemGrenade>() != null
+            || __instance.GetComponent<ItemMine>() != null
+            || __instance.GetComponent<ItemReviveItem>() != null
+            || __instance.GetComponent<ItemHealthPack>() != null)
+        {
+            return;
+        }
+
+        __instance.destroyDisable = true;
     }
 
     [HarmonyPostfix]

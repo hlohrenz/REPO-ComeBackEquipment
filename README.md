@@ -13,6 +13,7 @@ Works with modded items as well!
 All clients need the mod installed for it to work correctly.
 
 ## Changelog
+- **2.0.1**: Consumables like health packs, grenades, mines get destroyed so they can be consumed
 - **2.0.0**: Updated to work with the cosmetics update
 - **1.0.0**: Initial release
 
