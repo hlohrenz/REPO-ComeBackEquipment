@@ -1,0 +1,7 @@
+{
+    "name": "ComeBackEquipment",
+    "description": "Prevents equippable items from being destroyed in death pits so they bounce back like dead heads.",
+    "version_number": "2.0.0",
+    "website_url": "",
+    "dependencies": ["BepInEx-BepInExPack-5.4.2305"]
+}
