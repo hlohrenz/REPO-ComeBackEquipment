@@ -7,19 +7,63 @@ namespace ComeBackEquipment;
 [HarmonyPatch]
 internal static class HurtColliderPatch
 {
+    private static bool IsHaulerVehicle(PhysGrabObject physGrabObject)
+    {
+        ItemVehicle? itemVehicle = physGrabObject.GetComponentInParent<ItemVehicle>();
+        return itemVehicle?.valuableBox != null;
+    }
+
+    private static bool TryTeleportToTruck(PhysGrabObject physGrabObject)
+    {
+        if (!TruckSafetySpawnPoint.instance)
+        {
+            return false;
+        }
+
+        physGrabObject.rb.velocity = Vector3.zero;
+        physGrabObject.rb.angularVelocity = Vector3.zero;
+        physGrabObject.Teleport(TruckSafetySpawnPoint.instance.transform.position, TruckSafetySpawnPoint.instance.transform.rotation);
+        physGrabObject.DeathPitEffectCreate();
+        return true;
+    }
+
+    private static bool ShouldTeleportToTruck(PhysGrabObject physGrabObject)
+    {
+        if (physGrabObject.GetComponentInParent<ItemVehicle>())
+        {
+            return ComeBackEquipment.TeleportHaulersToTruck.Value;
+        }
+
+        return physGrabObject.GetComponentInParent<ItemEquippable>() != null && ComeBackEquipment.TeleportItemsToTruck.Value;
+    }
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(PhysGrabObjectImpactDetector), "Start")]
     private static void ImpactDetectorStartPostfix(PhysGrabObjectImpactDetector __instance)
     {
-        if (__instance.GetComponent<ItemEquippable>() == null)
+        bool isEquippable = __instance.GetComponentInParent<ItemEquippable>() != null;
+        bool isHaulerVehicle = __instance.GetComponentInParent<ItemVehicle>() != null;
+
+        if (!isEquippable && !isHaulerVehicle)
         {
             return;
         }
 
-        if (__instance.GetComponent<ItemGrenade>() != null
-            || __instance.GetComponent<ItemMine>() != null
-            || __instance.GetComponent<ItemReviveItem>() != null
-            || __instance.GetComponent<ItemHealthPack>() != null)
+        if (isHaulerVehicle && ComeBackEquipment.TeleportHaulersToTruck.Value)
+        {
+            __instance.destroyDisable = true;
+            return;
+        }
+
+        if (!isEquippable)
+        {
+            return;
+        }
+
+        if (__instance.GetComponentInParent<ItemGrenade>() != null
+            || __instance.GetComponentInParent<ItemMine>() != null
+            || __instance.GetComponentInParent<ItemReviveItem>() != null
+            || __instance.GetComponentInParent<ItemHealthPack>() != null)
         {
             return;
         }
@@ -57,8 +101,23 @@ internal static class HurtColliderPatch
             return;
         }
 
-        physGrabObject.rb.velocity = Vector3.zero;
-        physGrabObject.rb.angularVelocity = Vector3.zero;
+        bool isHaulerVehicle = IsHaulerVehicle(physGrabObject);
+
+        if (isHaulerVehicle && ComeBackEquipment.TeleportHaulersToTruck.Value)
+        {
+            if (TryTeleportToTruck(physGrabObject))
+            {
+                return;
+            }
+        }
+
+        if (ComeBackEquipment.TeleportItemsToTruck.Value)
+        {
+            if (TryTeleportToTruck(physGrabObject))
+            {
+                return;
+            }
+        }
 
         Vector3 randomHorizontal = Random.insideUnitSphere.normalized * 4f;
         randomHorizontal.y = 0f;
@@ -69,5 +128,28 @@ internal static class HurtColliderPatch
         physGrabObject.rb.AddForce(launchForce, ForceMode.Impulse);
         physGrabObject.rb.AddTorque(launchTorque, ForceMode.Impulse);
         physGrabObject.DeathPitEffectCreate();
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(HurtCollider), "PhysObjectHurt")]
+    private static bool PhysObjectHurtPrefix(HurtCollider __instance, PhysGrabObject physGrabObject, HurtCollider.BreakImpact impact, float hitForce, float hitTorque, bool apply, bool destroyLaunch, ref bool __result, Enemy? enemy = null)
+    {
+        if (!__instance.deathPit || !SemiFunc.IsMasterClientOrSingleplayer() || !physGrabObject || !physGrabObject.rb)
+        {
+            return true;
+        }
+
+        if (!ShouldTeleportToTruck(physGrabObject))
+        {
+            return true;
+        }
+
+        if (TryTeleportToTruck(physGrabObject))
+        {
+            __result = true;
+            return false;
+        }
+
+        return true;
     }
 }
